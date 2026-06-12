@@ -140,4 +140,3 @@ function handleLogout() {
       </nav>
     </>
   )
-}
