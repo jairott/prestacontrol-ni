@@ -1,19 +1,19 @@
 import { useState } from 'react'
-import { supabase } from '../supabase'
 
-export default function Login() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
+const PIN_ADMIN = '1234'
+
+export default function Login({ onLogin }) {
+  const [pin, setPin] = useState('')
   const [error, setError] = useState('')
 
-  async function handleLogin(e) {
+  function handleSubmit(e) {
     e.preventDefault()
-    setError('')
-    setLoading(true)
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) setError('Correo o contraseña incorrectos.')
-    setLoading(false)
+    if (pin === PIN_ADMIN) {
+      onLogin('admin')
+    } else {
+      setError('PIN incorrecto. Intenta de nuevo.')
+      setPin('')
+    }
   }
 
   return (
@@ -27,31 +27,23 @@ export default function Login() {
 
         {error && <div className="error-msg">{error}</div>}
 
-        <form onSubmit={handleLogin}>
+        <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label>Correo electrónico</label>
-            <input
-              type="email"
-              placeholder="tu@correo.com"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-            />
-          </div>
-          <div className="form-group">
-            <label>Contraseña</label>
+            <label>Ingresa tu PIN</label>
             <input
               type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
+              inputMode="numeric"
+              pattern="[0-9]*"
+              placeholder="••••"
+              value={pin}
+              onChange={e => { setPin(e.target.value); setError('') }}
+              maxLength={6}
+              autoFocus
               required
-              autoComplete="current-password"
             />
           </div>
-          <button className="btn-primary" type="submit" disabled={loading}>
-            {loading ? 'Entrando...' : 'Entrar'}
+          <button className="btn-primary" type="submit">
+            Entrar
           </button>
         </form>
       </div>
