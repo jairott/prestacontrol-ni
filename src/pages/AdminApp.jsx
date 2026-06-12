@@ -4,7 +4,7 @@ import { useToast, fmt, initials, today } from '../utils'
 import NuevoPrestamo from '../components/NuevoPrestamo'
 import DetallePrestamo from '../components/DetallePrestamo'
 
-export default function AdminApp({ session }) {
+export default function AdminApp({ session, onLogout }) 
   const [tab, setTab] = useState('panel')
   const [prestamos, setPrestamos] = useState([])
   const [loading, setLoading] = useState(true)
@@ -29,9 +29,9 @@ export default function AdminApp({ session }) {
     setPrestamos(data || [])
     setLoading(false)
   }
-
-  async function handleLogout() {
-    await supabase.auth.signOut()
+function handleLogout() {
+    if (onLogout) onLogout()
+  }
   }
 
   const hoy = today()
