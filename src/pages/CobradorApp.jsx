@@ -27,8 +27,8 @@ export default function  CobradorApp({ session, onLogout })
     setLoading(false)
   }
 
-  async function handleLogout() {
-    await supabase.auth.signOut()
+  function handleLogout() {
+    if (onLogout) onLogout()
   }
 
   const hoy = today()
