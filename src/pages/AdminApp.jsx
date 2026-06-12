@@ -29,9 +29,9 @@ export default function AdminApp({ session, onLogout }) {
     setPrestamos(data || [])
     setLoading(false)
   }
-function handleLogout() {
+
+  function handleLogout() {
     if (onLogout) onLogout()
-  }
   }
 
   const hoy = today()
@@ -140,3 +140,4 @@ function handleLogout() {
       </nav>
     </>
   )
+}
