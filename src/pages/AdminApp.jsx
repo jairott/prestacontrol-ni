@@ -4,7 +4,7 @@ import { useToast, fmt, initials, today } from '../utils'
 import NuevoPrestamo from '../components/NuevoPrestamo'
 import DetallePrestamo from '../components/DetallePrestamo'
 
-export default function AdminApp({ session, onLogout }) 
+export default function AdminApp({ session, onLogout }) {
   const [tab, setTab] = useState('panel')
   const [prestamos, setPrestamos] = useState([])
   const [loading, setLoading] = useState(true)
