@@ -3,7 +3,7 @@ import { supabase } from '../supabase'
 import { useToast, fmt, initials, today } from '../utils'
 import DetallePrestamo from '../components/DetallePrestamo'
 
-export default function CobradorApp({ session }) {
+export default function  CobradorApp({ session, onLogout })
   const [prestamos, setPrestamos] = useState([])
   const [loading, setLoading] = useState(true)
   const [detalle, setDetalle] = useState(null)
