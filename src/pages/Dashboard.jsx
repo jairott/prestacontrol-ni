@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { enviarReporteDisario } from '../lib/notificaciones'
+import { enviarReporteDiario } from '../lib/notificaciones'
 import { DollarSign, Users, AlertCircle, CheckCircle, Bell } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
@@ -40,7 +40,7 @@ export default function Dashboard() {
     if (ahora < medioDia && ultimoEnvio !== hoy) {
       const msHastaMediaDia = medioDia - ahora
       setTimeout(async () => {
-        const ok = await enviarReporteDisario()
+        const ok = await enviarReporteDiario()
         if (ok) {
           localStorage.setItem('ultimo_reporte', hoy)
           setEnviado(true)
@@ -51,7 +51,7 @@ export default function Dashboard() {
 
   const handleEnviarAhora = async () => {
     setEnviando(true)
-    const ok = await enviarReporteDisario()
+    const ok = await enviarReporteDiario()
     if (ok) {
       const hoy = new Date().toISOString().split('T')[0]
       localStorage.setItem('ultimo_reporte', hoy)
