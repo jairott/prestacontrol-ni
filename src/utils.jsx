@@ -18,7 +18,7 @@ export function useToast() {
 }
 
 export function fmt(n) {
- return 'C$ ' + Number(n).toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/\u202f/g, ',')
+return 'C$ ' + Number(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
 }
 
 export function initials(name) {
