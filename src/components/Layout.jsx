@@ -4,50 +4,59 @@ import { LayoutDashboard, FileText, LogOut, DollarSign } from 'lucide-react'
 export default function Layout({ onLogout }) {
   const navigate = useNavigate()
 
-  const navStyle = (isActive) => ({
-    display:'flex',alignItems:'center',gap:10,padding:'10px 16px',
-    borderRadius:10,textDecoration:'none',fontSize:14,fontWeight:500,
-    color: isActive ? 'white' : '#94a3b8',
-    background: isActive ? '#6366f1' : 'transparent',
-    transition:'all 0.2s'
-  })
-
   return (
-    <div style={{display:'flex',minHeight:'100vh',background:'#0f172a',fontFamily:'system-ui'}}>
-      {/* Sidebar */}
-      <aside style={{width:220,background:'#1e293b',padding:'1.5rem 1rem',display:'flex',flexDirection:'column',gap:4}}>
-        <div style={{display:'flex',alignItems:'center',gap:10,padding:'0 8px',marginBottom:'2rem'}}>
-          <div style={{width:36,height:36,background:'#6366f1',borderRadius:9,display:'flex',alignItems:'center',justifyContent:'center'}}>
-            <DollarSign size={18} color="white" />
+    <div style={{display:'flex',flexDirection:'column',minHeight:'100vh',background:'#0f172a',fontFamily:'system-ui'}}>
+      
+      {/* Header top */}
+      <header style={{background:'#1e293b',padding:'12px 20px',display:'flex',justifyContent:'space-between',alignItems:'center',borderBottom:'1px solid #334155'}}>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <div style={{width:32,height:32,background:'#6366f1',borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center'}}>
+            <DollarSign size={16} color="white" />
           </div>
           <div>
-            <p style={{color:'white',fontWeight:700,fontSize:14,margin:0}}>ControlPréstamos</p>
+            <p style={{color:'white',fontWeight:700,fontSize:14,margin:0,lineHeight:1}}>ControlPréstamos</p>
             <p style={{color:'#6366f1',fontSize:11,margin:0}}>Nicaragua</p>
           </div>
         </div>
+        <button onClick={onLogout} style={{
+          display:'flex',alignItems:'center',gap:6,color:'#94a3b8',background:'none',
+          border:'none',cursor:'pointer',fontSize:13,padding:'6px 10px',
+          borderRadius:8,background:'#0f172a'
+        }}>
+          <LogOut size={15}/> Salir
+        </button>
+      </header>
 
-        <NavLink to="/" end style={({isActive}) => navStyle(isActive)}>
-          <LayoutDashboard size={18} /> Dashboard
-        </NavLink>
-        <NavLink to="/prestamos" style={({isActive}) => navStyle(isActive)}>
-          <FileText size={18} /> Préstamos
-        </NavLink>
-
-        <div style={{marginTop:'auto'}}>
-          <button onClick={onLogout} style={{
-            display:'flex',alignItems:'center',gap:10,padding:'10px 16px',
-            borderRadius:10,border:'none',background:'transparent',
-            color:'#94a3b8',fontSize:14,cursor:'pointer',width:'100%'
-          }}>
-            <LogOut size={18} /> Salir
-          </button>
-        </div>
-      </aside>
-
-      {/* Main */}
-      <main style={{flex:1,padding:'2rem',overflowY:'auto'}}>
+      {/* Main content */}
+      <main style={{flex:1,padding:'1.25rem',overflowY:'auto',paddingBottom:'80px'}}>
         <Outlet />
       </main>
+
+      {/* Bottom nav */}
+      <nav style={{
+        position:'fixed',bottom:0,left:0,right:0,
+        background:'#1e293b',borderTop:'1px solid #334155',
+        display:'flex',zIndex:100
+      }}>
+        <NavLink to="/" end style={({isActive}) => ({
+          flex:1,display:'flex',flexDirection:'column',alignItems:'center',
+          padding:'10px 0',textDecoration:'none',gap:4,
+          color: isActive ? '#6366f1' : '#64748b',
+          borderTop: isActive ? '2px solid #6366f1' : '2px solid transparent'
+        })}>
+          <LayoutDashboard size={20}/>
+          <span style={{fontSize:11,fontWeight:500}}>Dashboard</span>
+        </NavLink>
+        <NavLink to="/prestamos" style={({isActive}) => ({
+          flex:1,display:'flex',flexDirection:'column',alignItems:'center',
+          padding:'10px 0',textDecoration:'none',gap:4,
+          color: isActive ? '#6366f1' : '#64748b',
+          borderTop: isActive ? '2px solid #6366f1' : '2px solid transparent'
+        })}>
+          <FileText size={20}/>
+          <span style={{fontSize:11,fontWeight:500}}>Préstamos</span>
+        </NavLink>
+      </nav>
     </div>
   )
 }
