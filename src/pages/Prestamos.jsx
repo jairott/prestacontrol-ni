@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useOutletContext } from 'react-router-dom'
 import { Plus, Search } from 'lucide-react'
 
 export default function Prestamos() {
   const [prestamos, setPrestamos] = useState([])
   const [buscar, setBuscar] = useState('')
   const navigate = useNavigate()
+  const { rol } = useOutletContext()
 
   useEffect(() => {
     supabase.from('prestamos').select('*').order('created_at', {ascending:false})
@@ -25,13 +26,15 @@ export default function Prestamos() {
           <h1 style={{color:'white',fontSize:'1.6rem',fontWeight:700,margin:0}}>Préstamos</h1>
           <p style={{color:'#64748b',fontSize:14,margin:0}}>{prestamos.length} préstamos registrados</p>
         </div>
-        <button onClick={() => navigate('/prestamos/nuevo')} style={{
-          display:'flex',alignItems:'center',gap:8,background:'#6366f1',
-          color:'white',border:'none',borderRadius:10,padding:'10px 18px',
-          fontWeight:600,cursor:'pointer',fontSize:14
-        }}>
-          <Plus size={16} /> Nuevo
-        </button>
+        {rol === 'admin' && (
+          <button onClick={() => navigate('/prestamos/nuevo')} style={{
+            display:'flex',alignItems:'center',gap:8,background:'#6366f1',
+            color:'white',border:'none',borderRadius:10,padding:'10px 18px',
+            fontWeight:600,cursor:'pointer',fontSize:14
+          }}>
+            <Plus size={16} /> Nuevo
+          </button>
+        )}
       </div>
 
       <div style={{position:'relative',marginBottom:'1.5rem'}}>

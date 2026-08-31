@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useOutletContext } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { ArrowLeft, CheckCircle, Circle, Trash2 } from 'lucide-react'
 
 export default function DetallePrestamo() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { rol } = useOutletContext()
   const [prestamo, setPrestamo] = useState(null)
   const [cuotas, setCuotas] = useState([])
   const [loading, setLoading] = useState(true)
@@ -60,10 +61,12 @@ export default function DetallePrestamo() {
         <button onClick={() => navigate('/prestamos')} style={{
           display:'flex',alignItems:'center',gap:6,color:'#94a3b8',background:'none',border:'none',cursor:'pointer',fontSize:14
         }}><ArrowLeft size={16}/> Volver</button>
-        <button onClick={eliminar} style={{
-          display:'flex',alignItems:'center',gap:6,color:'#ef4444',background:'#ef444415',
-          border:'none',borderRadius:8,padding:'7px 14px',cursor:'pointer',fontSize:13
-        }}><Trash2 size={14}/> Eliminar</button>
+        {rol === 'admin' && (
+          <button onClick={eliminar} style={{
+            display:'flex',alignItems:'center',gap:6,color:'#ef4444',background:'#ef444415',
+            border:'none',borderRadius:8,padding:'7px 14px',cursor:'pointer',fontSize:13
+          }}><Trash2 size={14}/> Eliminar</button>
+        )}
       </div>
 
       {/* Info cliente */}
