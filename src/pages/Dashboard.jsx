@@ -9,6 +9,8 @@ export default function Dashboard() {
   const [recientes, setRecientes] = useState([])
   const [atrasados, setAtrasados] = useState([])
   const [mostrarAtrasados, setMostrarAtrasados] = useState(false)
+  const [activos, setActivos] = useState([])
+  const [mostrarActivos, setMostrarActivos] = useState(false)
   const [enviando, setEnviando] = useState(false)
   const [enviado, setEnviado] = useState(false)
   const navigate = useNavigate()
@@ -43,6 +45,23 @@ export default function Dashboard() {
         }))
         .sort((a,b) => b.montoVencido - a.montoVencido)
       setAtrasados(listaAtrasados)
+
+      const cuotasPendientesPorPrestamo = {}
+      cuotas?.forEach(c => {
+        if (!c.pagada) {
+          if (!cuotasPendientesPorPrestamo[c.prestamo_id]) cuotasPendientesPorPrestamo[c.prestamo_id] = []
+          cuotasPendientesPorPrestamo[c.prestamo_id].push(c)
+        }
+      })
+      const listaActivos = prestamos
+        .filter(p => p.estado === 'activo')
+        .map(p => ({
+          ...p,
+          numCuotasPendientes: cuotasPendientesPorPrestamo[p.id]?.length || 0,
+          montoPendiente: cuotasPendientesPorPrestamo[p.id]?.reduce((s,c) => s + Number(c.monto), 0) || 0
+        }))
+        .sort((a,b) => b.montoPendiente - a.montoPendiente)
+      setActivos(listaActivos)
     }
     load()
 
@@ -81,8 +100,8 @@ export default function Dashboard() {
 
   const cards = [
     { label:'Total préstamos', value: stats.total, icon: Users, color:'#6366f1' },
-    { label:'Activos', value: stats.activos, icon: CheckCircle, color:'#22c55e' },
-    { label:'Cuotas vencidas', value: stats.vencidos, icon: AlertCircle, color:'#ef4444', onClick: () => setMostrarAtrasados(v => !v) },
+    { label:'Activos', value: stats.activos, icon: CheckCircle, color:'#22c55e', onClick: () => setMostrarActivos(v => !v), active: mostrarActivos },
+    { label:'Cuotas vencidas', value: stats.vencidos, icon: AlertCircle, color:'#ef4444', onClick: () => setMostrarAtrasados(v => !v), active: mostrarAtrasados },
     { label:'Total cobrado', value: `C$ ${stats.cobrado.toLocaleString('es-NI')}`, icon: DollarSign, color:'#f59e0b' },
   ]
 
@@ -114,7 +133,7 @@ export default function Dashboard() {
           <div key={i} onClick={c.onClick} style={{
             background:'#1e293b',borderRadius:14,padding:'1rem',display:'flex',gap:12,alignItems:'center',
             cursor: c.onClick ? 'pointer' : 'default',
-            border: c.onClick && mostrarAtrasados ? '1px solid #ef444488' : '1px solid transparent'
+            border: c.active ? `1px solid ${c.color}88` : '1px solid transparent'
           }}>
             <div style={{width:40,height:40,borderRadius:10,background:c.color+'22',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
               <c.icon size={18} color={c.color} />
@@ -126,6 +145,31 @@ export default function Dashboard() {
           </div>
         ))}
       </div>
+
+      {mostrarActivos && (
+        <div style={{background:'#1e293b',borderRadius:14,padding:'1.25rem',marginBottom:'1.5rem',border:'1px solid #22c55e44'}}>
+          <h2 style={{color:'white',fontSize:15,fontWeight:600,marginBottom:'0.75rem',display:'flex',alignItems:'center',gap:8}}>
+            <CheckCircle size={16} color="#22c55e" /> Préstamos activos ({activos.length})
+          </h2>
+          {activos.length === 0 ? (
+            <p style={{color:'#64748b',fontSize:14}}>No hay préstamos activos.</p>
+          ) : activos.map(p => (
+            <div key={p.id} onClick={() => navigate(`/prestamos/${p.id}`)} style={{
+              display:'flex',justifyContent:'space-between',alignItems:'center',
+              padding:'10px 0',borderBottom:'1px solid #334155',cursor:'pointer'
+            }}>
+              <div>
+                <p style={{color:'white',fontWeight:600,margin:0,fontSize:14}}>{p.cliente_nombre}</p>
+                <p style={{color:'#64748b',fontSize:12,margin:0}}>{p.direccion || 'Sin dirección'} · {p.telefono || 'Sin teléfono'}</p>
+              </div>
+              <div style={{textAlign:'right'}}>
+                <p style={{color:'#22c55e',fontWeight:700,margin:0,fontSize:14}}>C$ {p.montoPendiente.toLocaleString('es-NI')}</p>
+                <span style={{fontSize:11,color:'#64748b'}}>{p.numCuotasPendientes} cuota{p.numCuotasPendientes !== 1 ? 's' : ''} pendiente{p.numCuotasPendientes !== 1 ? 's' : ''}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {mostrarAtrasados && (
         <div style={{background:'#1e293b',borderRadius:14,padding:'1.25rem',marginBottom:'1.5rem',border:'1px solid #ef444444'}}>
