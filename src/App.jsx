@@ -1,26 +1,30 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Prestamos from './pages/Prestamos'
 import NuevoPrestamo from './pages/NuevoPrestamo'
 import DetallePrestamo from './pages/DetallePrestamo'
 import Layout from './components/Layout'
+import { supabase } from './lib/supabase'
 
 export default function App() {
-  const [authed, setAuthed] = useState(() => sessionStorage.getItem('authed') === 'true')
+  const [session, setSession] = useState(undefined)
 
-  const login = () => {
-    sessionStorage.setItem('authed', 'true')
-    setAuthed(true)
-  }
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSession(data.session))
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession)
+    })
+    return () => listener.subscription.unsubscribe()
+  }, [])
 
   const logout = () => {
-    sessionStorage.removeItem('authed')
-    setAuthed(false)
+    supabase.auth.signOut()
   }
 
-  if (!authed) return <Login onLogin={login} />
+  if (session === undefined) return null
+  if (!session) return <Login onLogin={() => {}} />
 
   return (
     <BrowserRouter>
