@@ -7,6 +7,8 @@ import { useNavigate } from 'react-router-dom'
 export default function Dashboard() {
   const [stats, setStats] = useState({ total:0, activos:0, vencidos:0, cobrado:0 })
   const [recientes, setRecientes] = useState([])
+  const [atrasados, setAtrasados] = useState([])
+  const [mostrarAtrasados, setMostrarAtrasados] = useState(false)
   const [enviando, setEnviando] = useState(false)
   const [enviado, setEnviado] = useState(false)
   const navigate = useNavigate()
@@ -24,6 +26,23 @@ export default function Dashboard() {
 
       setStats({ total: prestamos.length, activos, vencidos: vencidas, cobrado })
       setRecientes(prestamos.slice(-5).reverse())
+
+      const cuotasVencidasPorPrestamo = {}
+      cuotas?.forEach(c => {
+        if (!c.pagada && c.fecha < hoy) {
+          if (!cuotasVencidasPorPrestamo[c.prestamo_id]) cuotasVencidasPorPrestamo[c.prestamo_id] = []
+          cuotasVencidasPorPrestamo[c.prestamo_id].push(c)
+        }
+      })
+      const listaAtrasados = prestamos
+        .filter(p => cuotasVencidasPorPrestamo[p.id])
+        .map(p => ({
+          ...p,
+          numCuotasVencidas: cuotasVencidasPorPrestamo[p.id].length,
+          montoVencido: cuotasVencidasPorPrestamo[p.id].reduce((s,c) => s + Number(c.monto), 0)
+        }))
+        .sort((a,b) => b.montoVencido - a.montoVencido)
+      setAtrasados(listaAtrasados)
     }
     load()
 
@@ -63,7 +82,7 @@ export default function Dashboard() {
   const cards = [
     { label:'Total préstamos', value: stats.total, icon: Users, color:'#6366f1' },
     { label:'Activos', value: stats.activos, icon: CheckCircle, color:'#22c55e' },
-    { label:'Cuotas vencidas', value: stats.vencidos, icon: AlertCircle, color:'#ef4444' },
+    { label:'Cuotas vencidas', value: stats.vencidos, icon: AlertCircle, color:'#ef4444', onClick: () => setMostrarAtrasados(v => !v) },
     { label:'Total cobrado', value: `C$ ${stats.cobrado.toLocaleString('es-NI')}`, icon: DollarSign, color:'#f59e0b' },
   ]
 
@@ -92,7 +111,11 @@ export default function Dashboard() {
 
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:12,marginBottom:'1.5rem'}}>
         {cards.map((c,i) => (
-          <div key={i} style={{background:'#1e293b',borderRadius:14,padding:'1rem',display:'flex',gap:12,alignItems:'center'}}>
+          <div key={i} onClick={c.onClick} style={{
+            background:'#1e293b',borderRadius:14,padding:'1rem',display:'flex',gap:12,alignItems:'center',
+            cursor: c.onClick ? 'pointer' : 'default',
+            border: c.onClick && mostrarAtrasados ? '1px solid #ef444488' : '1px solid transparent'
+          }}>
             <div style={{width:40,height:40,borderRadius:10,background:c.color+'22',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
               <c.icon size={18} color={c.color} />
             </div>
@@ -103,6 +126,31 @@ export default function Dashboard() {
           </div>
         ))}
       </div>
+
+      {mostrarAtrasados && (
+        <div style={{background:'#1e293b',borderRadius:14,padding:'1.25rem',marginBottom:'1.5rem',border:'1px solid #ef444444'}}>
+          <h2 style={{color:'white',fontSize:15,fontWeight:600,marginBottom:'0.75rem',display:'flex',alignItems:'center',gap:8}}>
+            <AlertCircle size={16} color="#ef4444" /> Clientes atrasados ({atrasados.length})
+          </h2>
+          {atrasados.length === 0 ? (
+            <p style={{color:'#64748b',fontSize:14}}>Nadie está atrasado ahora mismo.</p>
+          ) : atrasados.map(p => (
+            <div key={p.id} onClick={() => navigate(`/prestamos/${p.id}`)} style={{
+              display:'flex',justifyContent:'space-between',alignItems:'center',
+              padding:'10px 0',borderBottom:'1px solid #334155',cursor:'pointer'
+            }}>
+              <div>
+                <p style={{color:'white',fontWeight:600,margin:0,fontSize:14}}>{p.cliente_nombre}</p>
+                <p style={{color:'#64748b',fontSize:12,margin:0}}>{p.direccion || 'Sin dirección'} · {p.telefono || 'Sin teléfono'}</p>
+              </div>
+              <div style={{textAlign:'right'}}>
+                <p style={{color:'#ef4444',fontWeight:700,margin:0,fontSize:14}}>C$ {p.montoVencido.toLocaleString('es-NI')}</p>
+                <span style={{fontSize:11,color:'#64748b'}}>{p.numCuotasVencidas} cuota{p.numCuotasVencidas !== 1 ? 's' : ''} vencida{p.numCuotasVencidas !== 1 ? 's' : ''}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div style={{background:'#1e293b',borderRadius:14,padding:'1.25rem'}}>
         <h2 style={{color:'white',fontSize:15,fontWeight:600,marginBottom:'0.75rem'}}>Préstamos recientes</h2>
