@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { enviarReporteDiario } from '../lib/notificaciones'
-import { DollarSign, Users, AlertCircle, CheckCircle, Bell } from 'lucide-react'
+import { DollarSign, Users, AlertCircle, CheckCircle, Bell, Wallet } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 export default function Dashboard() {
-  const [stats, setStats] = useState({ total:0, activos:0, vencidos:0, cobrado:0 })
+  const [stats, setStats] = useState({ total:0, activos:0, vencidos:0, cobrado:0, porRecoger:0 })
   const [recientes, setRecientes] = useState([])
   const [atrasados, setAtrasados] = useState([])
   const [mostrarAtrasados, setMostrarAtrasados] = useState(false)
@@ -27,8 +27,9 @@ export default function Dashboard() {
       const hoy = new Date().toISOString().split('T')[0]
       const vencidas = cuotas?.filter(c => !c.pagada && c.fecha < hoy).length || 0
       const cobrado = cuotas?.filter(c => c.pagada).reduce((s,c) => s + Number(c.monto), 0) || 0
+      const porRecoger = cuotas?.filter(c => !c.pagada).reduce((s,c) => s + Number(c.monto), 0) || 0
 
-      setStats({ total: prestamos.length, activos, vencidos: vencidas, cobrado })
+      setStats({ total: prestamos.length, activos, vencidos: vencidas, cobrado, porRecoger })
       setRecientes(prestamos.slice(-5).reverse())
       setTodos([...prestamos].sort((a,b) => (a.cliente_nombre || '').localeCompare(b.cliente_nombre || '')))
 
@@ -106,6 +107,7 @@ export default function Dashboard() {
     { label:'Activos', value: stats.activos, icon: CheckCircle, color:'#22c55e', onClick: () => setMostrarActivos(v => !v), active: mostrarActivos },
     { label:'Cuotas vencidas', value: stats.vencidos, icon: AlertCircle, color:'#ef4444', onClick: () => setMostrarAtrasados(v => !v), active: mostrarAtrasados },
     { label:'Total cobrado', value: `C$ ${stats.cobrado.toLocaleString('es-NI')}`, icon: DollarSign, color:'#f59e0b' },
+    { label:'Capital por recoger', value: `C$ ${stats.porRecoger.toLocaleString('es-NI')}`, icon: Wallet, color:'#a855f7', onClick: () => setMostrarActivos(v => !v), active: mostrarActivos },
   ]
 
   return (
