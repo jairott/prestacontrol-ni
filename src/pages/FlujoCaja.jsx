@@ -16,7 +16,7 @@ export default function FlujoCaja() {
     setLoading(true)
     const { data } = await supabase
       .from('movimientos_caja')
-      .select('*')
+      .select('*, prestamos(cliente_nombre)')
       .order('fecha', { ascending: false })
       .order('created_at', { ascending: false })
     setMovimientos(data || [])
@@ -167,8 +167,8 @@ export default function FlujoCaja() {
                   padding:'8px 0',borderBottom:'1px solid #334155',cursor: m.prestamo_id ? 'pointer' : 'default'
                 }}>
                   <div>
-                    <p style={{color:'white',fontWeight:500,margin:0,fontSize:13}}>{m.concepto}</p>
-                    <p style={{color:'#64748b',fontSize:11,margin:0}}>{m.tipo === 'entrada' ? 'Entrada' : 'Salida'}</p>
+                    <p style={{color:'white',fontWeight:600,margin:0,fontSize:13}}>{m.prestamos?.cliente_nombre || m.concepto}</p>
+                    <p style={{color:'#64748b',fontSize:11,margin:0}}>{m.prestamos?.cliente_nombre ? m.concepto : (m.tipo === 'entrada' ? 'Entrada' : 'Salida')}</p>
                   </div>
                   <p style={{color: m.tipo === 'entrada' ? '#22c55e' : '#ef4444',fontWeight:700,margin:0,fontSize:14}}>
                     {m.tipo === 'entrada' ? '+' : '-'}C$ {Number(m.monto).toLocaleString('es-NI')}
