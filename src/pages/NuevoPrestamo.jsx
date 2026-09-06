@@ -61,6 +61,14 @@ export default function NuevoPrestamo() {
       }
       await supabase.from('cuotas').insert(cuotas)
 
+      await supabase.from('movimientos_caja').insert({
+        tipo: 'salida',
+        monto,
+        concepto: `Préstamo entregado a ${form.cliente_nombre}`,
+        fecha: form.fecha_inicio,
+        prestamo_id: prestamo.id
+      })
+
       navigate(`/prestamos/${prestamo.id}`)
     } catch(e) {
       setError(e.message)

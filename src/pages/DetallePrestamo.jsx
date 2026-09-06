@@ -33,6 +33,20 @@ export default function DetallePrestamo() {
     if (error) { alert('No se pudo actualizar la cuota: ' + error.message); return }
     setCuotas(prev => prev.map(c => c.id === cuota.id ? data : c))
 
+    // Reflejar el movimiento en la caja
+    if (nuevaPagada) {
+      await supabase.from('movimientos_caja').insert({
+        tipo: 'entrada',
+        monto: cuota.monto,
+        concepto: `Pago cuota #${cuota.num} - ${prestamo.cliente_nombre}`,
+        fecha: data.fecha_pago,
+        prestamo_id: id,
+        cuota_id: cuota.id
+      })
+    } else {
+      await supabase.from('movimientos_caja').delete().eq('cuota_id', cuota.id)
+    }
+
     // Si todas pagadas → marcar préstamo como pagado
     const nuevas = cuotas.map(c => c.id === cuota.id ? data : c)
     if (nuevas.every(c => c.pagada)) {
