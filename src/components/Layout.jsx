@@ -1,5 +1,5 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, FileText, LogOut, DollarSign } from 'lucide-react'
+import { LayoutDashboard, FileText, LogOut, DollarSign, Wallet } from 'lucide-react'
 
 export default function Layout({ onLogout }) {
   const navigate = useNavigate()
@@ -55,6 +55,15 @@ export default function Layout({ onLogout }) {
         })}>
           <FileText size={20}/>
           <span style={{fontSize:11,fontWeight:500}}>Préstamos</span>
+        </NavLink>
+        <NavLink to="/caja" style={({isActive}) => ({
+          flex:1,display:'flex',flexDirection:'column',alignItems:'center',
+          padding:'10px 0',textDecoration:'none',gap:4,
+          color: isActive ? '#6366f1' : '#64748b',
+          borderTop: isActive ? '2px solid #6366f1' : '2px solid transparent'
+        })}>
+          <Wallet size={20}/>
+          <span style={{fontSize:11,fontWeight:500}}>Caja</span>
         </NavLink>
       </nav>
     </div>
