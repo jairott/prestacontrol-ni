@@ -23,8 +23,12 @@ export default function DetallePrestamo() {
   }, [id])
 
   const toggleCuota = async (cuota) => {
+    const nuevaPagada = !cuota.pagada
     const { data } = await supabase.from('cuotas')
-      .update({ pagada: !cuota.pagada })
+      .update({
+        pagada: nuevaPagada,
+        fecha_pago: nuevaPagada ? new Date().toISOString().split('T')[0] : null
+      })
       .eq('id', cuota.id).select().single()
     setCuotas(prev => prev.map(c => c.id === cuota.id ? data : c))
 

@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard'
 import Prestamos from './pages/Prestamos'
 import NuevoPrestamo from './pages/NuevoPrestamo'
 import DetallePrestamo from './pages/DetallePrestamo'
+import FlujoCaja from './pages/FlujoCaja'
 import Layout from './components/Layout'
 import { supabase } from './lib/supabase'
 
@@ -34,6 +35,7 @@ export default function App() {
           <Route path="prestamos" element={<Prestamos />} />
           <Route path="prestamos/nuevo" element={<NuevoPrestamo />} />
           <Route path="prestamos/:id" element={<DetallePrestamo />} />
+          <Route path="caja" element={<FlujoCaja />} />
         </Route>
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
