@@ -78,7 +78,7 @@ export default function FlujoCaja() {
       </div>
 
       <p style={{color:'#475569',fontSize:12,marginBottom:'1.5rem'}}>
-        Los pagos de cuotas y los préstamos entregados se registran solos. Usa "Nuevo movimiento" para gastos u otras entradas/salidas.
+        Los pagos de cuotas se registran solos como entrada. El dinero entregado en préstamos nuevos NO se registra aquí (es inyección de capital) — usa "Nuevo movimiento" para anotar gastos, salidas de préstamos u otras entradas/salidas a mano.
       </p>
 
       {mostrarForm && (
