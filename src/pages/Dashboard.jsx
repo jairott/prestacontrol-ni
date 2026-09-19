@@ -26,8 +26,8 @@ export default function Dashboard() {
       const activos = prestamos.filter(p => p.estado === 'activo').length
       const hoy = new Date().toISOString().split('T')[0]
       const vencidas = cuotas?.filter(c => !c.pagada && c.fecha < hoy).length || 0
-      const cobrado = cuotas?.filter(c => c.pagada).reduce((s,c) => s + Number(c.monto), 0) || 0
-      const porRecoger = cuotas?.filter(c => !c.pagada).reduce((s,c) => s + Number(c.monto), 0) || 0
+      const cobrado = cuotas?.reduce((s,c) => s + (c.pagada ? Number(c.monto) : Number(c.monto_pagado || 0)), 0) || 0
+      const porRecoger = cuotas?.filter(c => !c.pagada).reduce((s,c) => s + (Number(c.monto) - Number(c.monto_pagado || 0)), 0) || 0
 
       setStats({ total: prestamos.length, activos, vencidos: vencidas, cobrado, porRecoger })
       setRecientes(prestamos.slice(-5).reverse())
@@ -62,7 +62,7 @@ export default function Dashboard() {
         .map(p => ({
           ...p,
           numCuotasPendientes: cuotasPendientesPorPrestamo[p.id]?.length || 0,
-          montoPendiente: cuotasPendientesPorPrestamo[p.id]?.reduce((s,c) => s + Number(c.monto), 0) || 0
+          montoPendiente: cuotasPendientesPorPrestamo[p.id]?.reduce((s,c) => s + (Number(c.monto) - Number(c.monto_pagado || 0)), 0) || 0
         }))
         .sort((a,b) => b.montoPendiente - a.montoPendiente)
       setActivos(listaActivos)
