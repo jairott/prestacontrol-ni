@@ -9,6 +9,9 @@ export default function DetallePrestamo() {
   const [prestamo, setPrestamo] = useState(null)
   const [cuotas, setCuotas] = useState([])
   const [loading, setLoading] = useState(true)
+  const [abonoId, setAbonoId] = useState(null)
+  const [abonoMonto, setAbonoMonto] = useState('')
+  const [abonando, setAbonando] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -22,40 +25,92 @@ export default function DetallePrestamo() {
     load()
   }, [id])
 
-  const toggleCuota = async (cuota) => {
-    const nuevaPagada = !cuota.pagada
-    const { data, error } = await supabase.from('cuotas')
-      .update({
-        pagada: nuevaPagada,
-        fecha_pago: nuevaPagada ? new Date().toISOString().split('T')[0] : null
-      })
-      .eq('id', cuota.id).select().single()
-    if (error) { alert('No se pudo actualizar la cuota: ' + error.message); return }
-    setCuotas(prev => prev.map(c => c.id === cuota.id ? data : c))
-
-    // Reflejar el movimiento en la caja
-    if (nuevaPagada) {
-      await supabase.from('movimientos_caja').insert({
-        tipo: 'entrada',
-        monto: cuota.monto,
-        concepto: `Pago cuota #${cuota.num} - ${prestamo.cliente_nombre}`,
-        fecha: data.fecha_pago,
-        prestamo_id: id,
-        cuota_id: cuota.id
-      })
-    } else {
-      await supabase.from('movimientos_caja').delete().eq('cuota_id', cuota.id)
-    }
-
-    // Si todas pagadas → marcar préstamo como pagado
-    const nuevas = cuotas.map(c => c.id === cuota.id ? data : c)
-    if (nuevas.every(c => c.pagada)) {
+  const sincronizarEstadoPrestamo = async (nuevasCuotas) => {
+    if (nuevasCuotas.every(c => c.pagada)) {
       await supabase.from('prestamos').update({ estado:'pagado' }).eq('id', id)
       setPrestamo(p => ({...p, estado:'pagado'}))
     } else if (prestamo?.estado === 'pagado') {
       await supabase.from('prestamos').update({ estado:'activo' }).eq('id', id)
       setPrestamo(p => ({...p, estado:'activo'}))
     }
+  }
+
+  const toggleCuota = async (cuota) => {
+    const nuevaPagada = !cuota.pagada
+    const hoy = new Date().toISOString().split('T')[0]
+
+    if (nuevaPagada) {
+      // Paga de una vez lo que falte (si ya tenía abonos, solo cobra el resto)
+      const pendiente = Number(cuota.monto) - Number(cuota.monto_pagado || 0)
+      const { data, error } = await supabase.from('cuotas')
+        .update({ pagada: true, monto_pagado: cuota.monto, fecha_pago: hoy })
+        .eq('id', cuota.id).select().single()
+      if (error) { alert('No se pudo actualizar la cuota: ' + error.message); return }
+      setCuotas(prev => prev.map(c => c.id === cuota.id ? data : c))
+
+      if (pendiente > 0.01) {
+        await supabase.from('movimientos_caja').insert({
+          tipo: 'entrada',
+          monto: pendiente,
+          concepto: `Pago cuota #${cuota.num} - ${prestamo.cliente_nombre}`,
+          fecha: hoy,
+          prestamo_id: id,
+          cuota_id: cuota.id
+        })
+      }
+      await sincronizarEstadoPrestamo(cuotas.map(c => c.id === cuota.id ? data : c))
+    } else {
+      // Deshacer: borra todo lo cobrado en esta cuota (pagos y abonos)
+      const { data, error } = await supabase.from('cuotas')
+        .update({ pagada: false, monto_pagado: 0, fecha_pago: null })
+        .eq('id', cuota.id).select().single()
+      if (error) { alert('No se pudo actualizar la cuota: ' + error.message); return }
+      setCuotas(prev => prev.map(c => c.id === cuota.id ? data : c))
+      await supabase.from('movimientos_caja').delete().eq('cuota_id', cuota.id)
+      await sincronizarEstadoPrestamo(cuotas.map(c => c.id === cuota.id ? data : c))
+    }
+  }
+
+  const abrirAbono = (e, cuotaId) => {
+    e.stopPropagation()
+    setAbonoId(prev => prev === cuotaId ? null : cuotaId)
+    setAbonoMonto('')
+  }
+
+  const registrarAbono = async (e, cuota) => {
+    e.stopPropagation()
+    const monto = parseFloat(abonoMonto)
+    if (!monto || monto <= 0) { alert('Ingresa un monto de abono válido'); return }
+
+    const pendiente = Number(cuota.monto) - Number(cuota.monto_pagado || 0)
+    const abonoAplicado = Math.min(monto, pendiente)
+    const nuevoPagado = Number(cuota.monto_pagado || 0) + abonoAplicado
+    const completa = nuevoPagado >= Number(cuota.monto) - 0.01
+    const hoy = new Date().toISOString().split('T')[0]
+
+    setAbonando(true)
+    const { data, error } = await supabase.from('cuotas')
+      .update({
+        monto_pagado: completa ? cuota.monto : nuevoPagado,
+        pagada: completa,
+        fecha_pago: completa ? hoy : cuota.fecha_pago
+      })
+      .eq('id', cuota.id).select().single()
+    setAbonando(false)
+    if (error) { alert('No se pudo registrar el abono: ' + error.message); return }
+    setCuotas(prev => prev.map(c => c.id === cuota.id ? data : c))
+
+    await supabase.from('movimientos_caja').insert({
+      tipo: 'entrada',
+      monto: abonoAplicado,
+      concepto: `${completa ? 'Pago' : 'Abono'} cuota #${cuota.num} - ${prestamo.cliente_nombre}`,
+      fecha: hoy,
+      prestamo_id: id,
+      cuota_id: cuota.id
+    })
+
+    setAbonoId(null); setAbonoMonto('')
+    await sincronizarEstadoPrestamo(cuotas.map(c => c.id === cuota.id ? data : c))
   }
 
   const eliminar = async () => {
@@ -68,7 +123,7 @@ export default function DetallePrestamo() {
   if (!prestamo) return <p style={{color:'#ef4444'}}>No encontrado.</p>
 
   const pagadas = cuotas.filter(c => c.pagada).length
-  const totalCobrado = cuotas.filter(c => c.pagada).reduce((s,c) => s+Number(c.monto),0)
+  const totalCobrado = cuotas.reduce((s,c) => s + (c.pagada ? Number(c.monto) : Number(c.monto_pagado || 0)), 0)
   const totalDeuda = cuotas.reduce((s,c) => s+Number(c.monto),0)
   const hoy = new Date().toISOString().split('T')[0]
   const vencidas = cuotas.filter(c => !c.pagada && c.fecha < hoy).length
@@ -135,26 +190,56 @@ export default function DetallePrestamo() {
         <div style={{display:'flex',flexDirection:'column',gap:8}}>
           {cuotas.map(c => {
             const vencida = !c.pagada && c.fecha < hoy
+            const abonado = Number(c.monto_pagado || 0)
+            const tieneAbono = !c.pagada && abonado > 0
+            const pendiente = Number(c.monto) - abonado
             return (
-              <div key={c.id} onClick={() => toggleCuota(c)} style={{
-                display:'flex',justifyContent:'space-between',alignItems:'center',
-                padding:'10px 14px',borderRadius:10,cursor:'pointer',
-                background: c.pagada ? '#22c55e11' : vencida ? '#ef444411' : '#0f172a',
-                border: `1px solid ${c.pagada ? '#22c55e33' : vencida ? '#ef444433' : '#334155'}`
+              <div key={c.id} style={{
+                borderRadius:10,
+                background: c.pagada ? '#22c55e11' : tieneAbono ? '#f59e0b11' : vencida ? '#ef444411' : '#0f172a',
+                border: `1px solid ${c.pagada ? '#22c55e33' : tieneAbono ? '#f59e0b44' : vencida ? '#ef444433' : '#334155'}`
               }}>
-                <div style={{display:'flex',alignItems:'center',gap:10}}>
-                  {c.pagada
-                    ? <CheckCircle size={18} color="#22c55e" />
-                    : <Circle size={18} color={vencida ? '#ef4444' : '#64748b'} />
-                  }
-                  <div>
-                    <p style={{color:'white',fontSize:13,fontWeight:500,margin:0}}>Cuota #{c.num}</p>
-                    <p style={{color: vencida ? '#ef4444' : '#64748b',fontSize:12,margin:0}}>{c.fecha}</p>
+                <div onClick={() => toggleCuota(c)} style={{
+                  display:'flex',justifyContent:'space-between',alignItems:'center',
+                  padding:'10px 14px',cursor:'pointer'
+                }}>
+                  <div style={{display:'flex',alignItems:'center',gap:10}}>
+                    {c.pagada
+                      ? <CheckCircle size={18} color="#22c55e" />
+                      : <Circle size={18} color={tieneAbono ? '#f59e0b' : vencida ? '#ef4444' : '#64748b'} />
+                    }
+                    <div>
+                      <p style={{color:'white',fontSize:13,fontWeight:500,margin:0}}>Cuota #{c.num}</p>
+                      <p style={{color: tieneAbono ? '#f59e0b' : vencida ? '#ef4444' : '#64748b',fontSize:12,margin:0}}>
+                        {tieneAbono ? `Abonado C$ ${abonado.toLocaleString('es-NI')} · falta C$ ${pendiente.toLocaleString('es-NI')}` : c.fecha}
+                      </p>
+                    </div>
+                  </div>
+                  <div style={{display:'flex',alignItems:'center',gap:10}}>
+                    {!c.pagada && (
+                      <button onClick={(e) => abrirAbono(e, c.id)} style={{
+                        background:'#6366f122',color:'#a5b4fc',border:'1px solid #6366f144',
+                        borderRadius:8,padding:'5px 10px',fontSize:12,fontWeight:600,cursor:'pointer'
+                      }}>Abonar</button>
+                    )}
+                    <p style={{color: c.pagada ? '#22c55e' : 'white',fontWeight:600,margin:0,fontSize:14}}>
+                      C$ {Number(c.monto).toLocaleString('es-NI')}
+                    </p>
                   </div>
                 </div>
-                <p style={{color: c.pagada ? '#22c55e' : 'white',fontWeight:600,margin:0,fontSize:14}}>
-                  C$ {Number(c.monto).toLocaleString('es-NI')}
-                </p>
+
+                {abonoId === c.id && (
+                  <div onClick={e => e.stopPropagation()} style={{display:'flex',gap:8,padding:'0 14px 12px'}}>
+                    <input type="number" autoFocus value={abonoMonto} onChange={e => setAbonoMonto(e.target.value)}
+                      placeholder={`Máx C$ ${pendiente.toLocaleString('es-NI')}`}
+                      style={{flex:1,background:'#0f172a',border:'1px solid #334155',borderRadius:8,
+                        padding:'8px 10px',color:'white',fontSize:13,boxSizing:'border-box'}} />
+                    <button onClick={(e) => registrarAbono(e, c)} disabled={abonando} style={{
+                      background:'#6366f1',color:'white',border:'none',borderRadius:8,
+                      padding:'8px 14px',fontSize:13,fontWeight:600,cursor:'pointer'
+                    }}>{abonando ? '...' : 'Guardar'}</button>
+                  </div>
+                )}
               </div>
             )
           })}
