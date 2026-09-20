@@ -1,16 +1,66 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { Wallet, TrendingUp, TrendingDown, Plus, X } from 'lucide-react'
+import { registrarAuditoria } from '../lib/auditoria'
+import { Wallet, TrendingUp, TrendingDown, Plus, X, PiggyBank, History } from 'lucide-react'
+
+const ACCION_INFO = {
+  prestamo_creado: { label: 'Préstamo creado', color: '#6366f1' },
+  pago_cuota: { label: 'Pago de cuota', color: '#22c55e' },
+  abono_cuota: { label: 'Abono', color: '#f59e0b' },
+  pago_deshecho: { label: 'Pago deshecho', color: '#ef4444' },
+  prestamo_eliminado: { label: 'Préstamo eliminado', color: '#ef4444' },
+  capital_aporte: { label: 'Aporte de capital', color: '#a855f7' },
+  movimiento_caja_manual: { label: 'Movimiento manual', color: '#64748b' },
+}
 
 export default function FlujoCaja() {
+  const [tab, setTab] = useState('caja')
+  const navigate = useNavigate()
+
+  const tabs = [
+    { id:'caja', label:'Caja', icon: Wallet },
+    { id:'capital', label:'Capital', icon: PiggyBank },
+    { id:'auditoria', label:'Auditoría', icon: History },
+  ]
+
+  return (
+    <div>
+      <h1 style={{color:'white',fontSize:'1.6rem',fontWeight:700,margin:'0 0 0.25rem'}}>Finanzas</h1>
+      <p style={{color:'#64748b',fontSize:14,margin:'0 0 1.25rem'}}>Caja, capital y auditoría de movimientos</p>
+
+      <div style={{display:'flex',gap:8,marginBottom:'1.5rem',borderBottom:'1px solid #334155'}}>
+        {tabs.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)} style={{
+            display:'flex',alignItems:'center',gap:6,background:'none',border:'none',cursor:'pointer',
+            padding:'8px 4px 12px',marginRight:12,fontSize:13,fontWeight:600,
+            color: tab === t.id ? '#6366f1' : '#64748b',
+            borderBottom: tab === t.id ? '2px solid #6366f1' : '2px solid transparent'
+          }}>
+            <t.icon size={15}/> {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'caja' && <TabCaja navigate={navigate} />}
+      {tab === 'capital' && <TabCapital />}
+      {tab === 'auditoria' && <TabAuditoria navigate={navigate} />}
+    </div>
+  )
+}
+
+const inputStyle = {
+  width:'100%',background:'#0f172a',border:'1px solid #334155',borderRadius:9,
+  padding:'10px 14px',color:'white',fontSize:14,boxSizing:'border-box'
+}
+
+function TabCaja({ navigate }) {
   const [movimientos, setMovimientos] = useState([])
   const [loading, setLoading] = useState(true)
   const [mostrarForm, setMostrarForm] = useState(false)
   const [form, setForm] = useState({ tipo:'salida', monto:'', concepto:'', fecha: new Date().toISOString().split('T')[0] })
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
-  const navigate = useNavigate()
 
   const cargar = async () => {
     setLoading(true)
@@ -30,14 +80,20 @@ export default function FlujoCaja() {
       setError('El monto y el concepto son obligatorios'); return
     }
     setGuardando(true); setError('')
+    const monto = parseFloat(form.monto)
     const { error: err } = await supabase.from('movimientos_caja').insert({
       tipo: form.tipo,
-      monto: parseFloat(form.monto),
+      monto,
       concepto: form.concepto.trim(),
       fecha: form.fecha
     })
     setGuardando(false)
     if (err) { setError(err.message); return }
+    await registrarAuditoria({
+      accion: 'movimiento_caja_manual',
+      descripcion: `${form.tipo === 'entrada' ? 'Entrada' : 'Salida'} manual de caja: ${form.concepto.trim()}`,
+      monto
+    })
     setForm({ tipo:'salida', monto:'', concepto:'', fecha: new Date().toISOString().split('T')[0] })
     setMostrarForm(false)
     cargar()
@@ -56,18 +112,9 @@ export default function FlujoCaja() {
   })
   const fechas = Object.keys(grupos).sort((a, b) => b.localeCompare(a))
 
-  const inputStyle = {
-    width:'100%',background:'#0f172a',border:'1px solid #334155',borderRadius:9,
-    padding:'10px 14px',color:'white',fontSize:14,boxSizing:'border-box'
-  }
-
   return (
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'0.25rem'}}>
-        <div>
-          <h1 style={{color:'white',fontSize:'1.6rem',fontWeight:700,margin:0}}>Flujo de caja</h1>
-          <p style={{color:'#64748b',fontSize:14,margin:0}}>Registro desde hoy — entradas y salidas</p>
-        </div>
+      <div style={{display:'flex',justifyContent:'flex-end',marginBottom:'0.25rem'}}>
         <button onClick={() => setMostrarForm(v => !v)} style={{
           display:'flex',alignItems:'center',gap:6,background:'#6366f1',color:'white',
           border:'none',borderRadius:10,padding:'8px 14px',cursor:'pointer',fontSize:13,fontWeight:600
@@ -77,8 +124,8 @@ export default function FlujoCaja() {
         </button>
       </div>
 
-      <p style={{color:'#475569',fontSize:12,marginBottom:'1.5rem'}}>
-        Los pagos de cuotas se registran solos como entrada. El dinero entregado en préstamos nuevos NO se registra aquí (es inyección de capital) — usa "Nuevo movimiento" para anotar gastos, salidas de préstamos u otras entradas/salidas a mano.
+      <p style={{color:'#475569',fontSize:12,margin:'0.5rem 0 1.5rem'}}>
+        Los pagos de cuotas se registran solos como entrada. El dinero entregado en préstamos nuevos NO se registra aquí (es capital) — usa "Nuevo movimiento" para anotar gastos, salidas de préstamos u otras entradas/salidas a mano.
       </p>
 
       {mostrarForm && (
@@ -179,6 +226,225 @@ export default function FlujoCaja() {
           </div>
         )
       })}
+    </div>
+  )
+}
+
+function TabCapital() {
+  const [movimientos, setMovimientos] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [mostrarForm, setMostrarForm] = useState(false)
+  const [form, setForm] = useState({ monto:'', concepto:'', fecha: new Date().toISOString().split('T')[0] })
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState('')
+
+  const cargar = async () => {
+    setLoading(true)
+    const { data } = await supabase
+      .from('movimientos_capital')
+      .select('*, prestamos(cliente_nombre)')
+      .order('fecha', { ascending: false })
+      .order('created_at', { ascending: false })
+    setMovimientos(data || [])
+    setLoading(false)
+  }
+
+  useEffect(() => { cargar() }, [])
+
+  const aportarCapital = async () => {
+    if (!form.monto || !form.concepto.trim()) {
+      setError('El monto y el concepto son obligatorios'); return
+    }
+    setGuardando(true); setError('')
+    const monto = parseFloat(form.monto)
+    const { error: err } = await supabase.from('movimientos_capital').insert({
+      tipo: 'aporte',
+      monto,
+      concepto: form.concepto.trim(),
+      fecha: form.fecha
+    })
+    setGuardando(false)
+    if (err) { setError(err.message); return }
+    await registrarAuditoria({
+      accion: 'capital_aporte',
+      descripcion: `Aporte de capital: ${form.concepto.trim()}`,
+      monto
+    })
+    setForm({ monto:'', concepto:'', fecha: new Date().toISOString().split('T')[0] })
+    setMostrarForm(false)
+    cargar()
+  }
+
+  if (loading) return <p style={{color:'#64748b'}}>Cargando...</p>
+
+  const aportado = movimientos.filter(m => m.tipo === 'aporte').reduce((s,m) => s + Number(m.monto), 0)
+  const prestado = movimientos.filter(m => m.tipo === 'prestamo').reduce((s,m) => s + Number(m.monto), 0)
+  const disponible = aportado - prestado
+
+  const grupos = {}
+  movimientos.forEach(m => {
+    if (!grupos[m.fecha]) grupos[m.fecha] = []
+    grupos[m.fecha].push(m)
+  })
+  const fechas = Object.keys(grupos).sort((a, b) => b.localeCompare(a))
+
+  return (
+    <div>
+      <div style={{display:'flex',justifyContent:'flex-end',marginBottom:'0.25rem'}}>
+        <button onClick={() => setMostrarForm(v => !v)} style={{
+          display:'flex',alignItems:'center',gap:6,background:'#6366f1',color:'white',
+          border:'none',borderRadius:10,padding:'8px 14px',cursor:'pointer',fontSize:13,fontWeight:600
+        }}>
+          {mostrarForm ? <X size={15}/> : <Plus size={15}/>}
+          {mostrarForm ? 'Cancelar' : 'Aportar capital'}
+        </button>
+      </div>
+
+      <p style={{color:'#475569',fontSize:12,margin:'0.5rem 0 1.5rem'}}>
+        Cada préstamo nuevo resta automáticamente del capital disponible. Usa "Aportar capital" cuando metas dinero propio al negocio.
+      </p>
+
+      {mostrarForm && (
+        <div style={{background:'#1e293b',borderRadius:14,padding:'1.25rem',marginBottom:'1.5rem',border:'1px solid #6366f144'}}>
+          <label style={{color:'#94a3b8',fontSize:13,display:'block',marginBottom:6}}>Concepto *</label>
+          <input value={form.concepto} onChange={e => setForm(f => ({...f, concepto: e.target.value}))}
+            placeholder="Ej: capital inicial, aporte extra"
+            style={{...inputStyle, marginBottom:'1rem'}} />
+
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:'1rem'}}>
+            <div>
+              <label style={{color:'#94a3b8',fontSize:13,display:'block',marginBottom:6}}>Monto (C$) *</label>
+              <input type="number" value={form.monto} onChange={e => setForm(f => ({...f, monto: e.target.value}))}
+                placeholder="0" style={inputStyle} />
+            </div>
+            <div>
+              <label style={{color:'#94a3b8',fontSize:13,display:'block',marginBottom:6}}>Fecha</label>
+              <input type="date" value={form.fecha} onChange={e => setForm(f => ({...f, fecha: e.target.value}))}
+                style={inputStyle} />
+            </div>
+          </div>
+
+          {error && <p style={{color:'#ef4444',fontSize:13,marginBottom:'1rem'}}>{error}</p>}
+
+          <button onClick={aportarCapital} disabled={guardando} style={{
+            width:'100%',background:'#6366f1',color:'white',border:'none',
+            borderRadius:10,padding:'12px',fontWeight:700,fontSize:14,cursor:'pointer'
+          }}>{guardando ? 'Guardando...' : 'Registrar aporte'}</button>
+        </div>
+      )}
+
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:12,marginBottom:'1.5rem'}}>
+        {[
+          { label:'Aportado', value:`C$ ${aportado.toLocaleString('es-NI')}`, icon: TrendingUp, color:'#22c55e' },
+          { label:'Prestado', value:`C$ ${prestado.toLocaleString('es-NI')}`, icon: TrendingDown, color:'#ef4444' },
+          { label:'Capital disponible', value:`C$ ${disponible.toLocaleString('es-NI')}`, icon: PiggyBank, color: disponible >= 0 ? '#a855f7' : '#ef4444' },
+        ].map((c,i) => (
+          <div key={i} style={{
+            background:'#1e293b',borderRadius:14,padding:'1rem',display:'flex',gap:12,alignItems:'center'
+          }}>
+            <div style={{width:40,height:40,borderRadius:10,background:c.color+'22',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+              <c.icon size={18} color={c.color} />
+            </div>
+            <div>
+              <p style={{color:'#64748b',fontSize:11,margin:0}}>{c.label}</p>
+              <p style={{color:'white',fontSize:'1.1rem',fontWeight:700,margin:0}}>{c.value}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {fechas.length === 0 ? (
+        <div style={{background:'#1e293b',borderRadius:14,padding:'1.5rem'}}>
+          <p style={{color:'#64748b',fontSize:14,margin:0}}>Todavía no hay movimientos de capital.</p>
+        </div>
+      ) : fechas.map(fecha => (
+        <div key={fecha} style={{background:'#1e293b',borderRadius:14,padding:'1.25rem',marginBottom:'1rem'}}>
+          <h2 style={{color:'white',fontSize:14,fontWeight:600,margin:'0 0 0.75rem'}}>{fecha}</h2>
+          <div style={{display:'flex',flexDirection:'column',gap:8}}>
+            {grupos[fecha].map(m => (
+              <div key={m.id} style={{
+                display:'flex',justifyContent:'space-between',alignItems:'center',
+                padding:'8px 0',borderBottom:'1px solid #334155'
+              }}>
+                <div>
+                  <p style={{color:'white',fontWeight:600,margin:0,fontSize:13}}>{m.prestamos?.cliente_nombre || m.concepto}</p>
+                  <p style={{color:'#64748b',fontSize:11,margin:0}}>{m.tipo === 'aporte' ? 'Aporte' : 'Préstamo entregado'}</p>
+                </div>
+                <p style={{color: m.tipo === 'aporte' ? '#22c55e' : '#ef4444',fontWeight:700,margin:0,fontSize:14}}>
+                  {m.tipo === 'aporte' ? '+' : '-'}C$ {Number(m.monto).toLocaleString('es-NI')}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function TabAuditoria({ navigate }) {
+  const [registros, setRegistros] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function cargar() {
+      const { data } = await supabase
+        .from('auditoria')
+        .select('*, prestamos(cliente_nombre)')
+        .order('created_at', { ascending: false })
+        .limit(200)
+      setRegistros(data || [])
+      setLoading(false)
+    }
+    cargar()
+  }, [])
+
+  if (loading) return <p style={{color:'#64748b'}}>Cargando...</p>
+
+  const grupos = {}
+  registros.forEach(r => {
+    const fecha = r.created_at.split('T')[0]
+    if (!grupos[fecha]) grupos[fecha] = []
+    grupos[fecha].push(r)
+  })
+  const fechas = Object.keys(grupos).sort((a, b) => b.localeCompare(a))
+
+  return (
+    <div>
+      <p style={{color:'#475569',fontSize:12,margin:'0 0 1.5rem'}}>
+        Historial de todo lo que se registra, cobra, abona, deshace o elimina — para no perder rastro de nada, incluyendo lo que se borra por equivocación.
+      </p>
+
+      {fechas.length === 0 ? (
+        <div style={{background:'#1e293b',borderRadius:14,padding:'1.5rem'}}>
+          <p style={{color:'#64748b',fontSize:14,margin:0}}>Todavía no hay movimientos registrados.</p>
+        </div>
+      ) : fechas.map(fecha => (
+        <div key={fecha} style={{background:'#1e293b',borderRadius:14,padding:'1.25rem',marginBottom:'1rem'}}>
+          <h2 style={{color:'white',fontSize:14,fontWeight:600,margin:'0 0 0.75rem'}}>{fecha}</h2>
+          <div style={{display:'flex',flexDirection:'column',gap:10}}>
+            {grupos[fecha].map(r => {
+              const info = ACCION_INFO[r.accion] || { label: r.accion, color:'#64748b' }
+              const hora = new Date(r.created_at).toLocaleTimeString('es-NI', { hour:'2-digit', minute:'2-digit' })
+              return (
+                <div key={r.id} onClick={() => r.prestamo_id && navigate(`/prestamos/${r.prestamo_id}`)} style={{
+                  padding:'10px 12px',borderRadius:10,background:'#0f172a',
+                  border:`1px solid ${info.color}33`,cursor: r.prestamo_id ? 'pointer' : 'default'
+                }}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+                    <span style={{
+                      fontSize:11,fontWeight:700,color:info.color,background:info.color+'22',
+                      padding:'2px 8px',borderRadius:20
+                    }}>{info.label}</span>
+                    <span style={{color:'#64748b',fontSize:11}}>{hora}</span>
+                  </div>
+                  <p style={{color:'#e2e8f0',fontSize:13,margin:0}}>{r.descripcion}</p>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   )
 }

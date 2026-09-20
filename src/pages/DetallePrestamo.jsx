@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { ArrowLeft, CheckCircle, Circle, Trash2 } from 'lucide-react'
+import { registrarAuditoria } from '../lib/auditoria'
 
 export default function DetallePrestamo() {
   const { id } = useParams()
@@ -58,15 +59,30 @@ export default function DetallePrestamo() {
           cuota_id: cuota.id
         })
       }
+      await registrarAuditoria({
+        accion: 'pago_cuota',
+        descripcion: `Cuota #${cuota.num} de ${prestamo.cliente_nombre} marcada como pagada (C$ ${pendiente.toLocaleString('es-NI')} cobrados)`,
+        monto: pendiente,
+        prestamo_id: id,
+        cuota_id: cuota.id
+      })
       await sincronizarEstadoPrestamo(cuotas.map(c => c.id === cuota.id ? data : c))
     } else {
       // Deshacer: borra todo lo cobrado en esta cuota (pagos y abonos)
+      const montoDeshecho = Number(cuota.monto_pagado || 0)
       const { data, error } = await supabase.from('cuotas')
         .update({ pagada: false, monto_pagado: 0, fecha_pago: null })
         .eq('id', cuota.id).select().single()
       if (error) { alert('No se pudo actualizar la cuota: ' + error.message); return }
       setCuotas(prev => prev.map(c => c.id === cuota.id ? data : c))
       await supabase.from('movimientos_caja').delete().eq('cuota_id', cuota.id)
+      await registrarAuditoria({
+        accion: 'pago_deshecho',
+        descripcion: `Se deshizo el pago de la cuota #${cuota.num} de ${prestamo.cliente_nombre} (se habían cobrado C$ ${montoDeshecho.toLocaleString('es-NI')}, quedó pendiente otra vez)`,
+        monto: montoDeshecho,
+        prestamo_id: id,
+        cuota_id: cuota.id
+      })
       await sincronizarEstadoPrestamo(cuotas.map(c => c.id === cuota.id ? data : c))
     }
   }
@@ -109,12 +125,25 @@ export default function DetallePrestamo() {
       cuota_id: cuota.id
     })
 
+    await registrarAuditoria({
+      accion: 'abono_cuota',
+      descripcion: `Abono de C$ ${abonoAplicado.toLocaleString('es-NI')} a la cuota #${cuota.num} de ${prestamo.cliente_nombre}${completa ? ' (con esto quedó completa)' : ` (falta C$ ${(Number(cuota.monto) - nuevoPagado).toLocaleString('es-NI')})`}`,
+      monto: abonoAplicado,
+      prestamo_id: id,
+      cuota_id: cuota.id
+    })
+
     setAbonoId(null); setAbonoMonto('')
     await sincronizarEstadoPrestamo(cuotas.map(c => c.id === cuota.id ? data : c))
   }
 
   const eliminar = async () => {
     if (!confirm('¿Eliminar este préstamo?')) return
+    await registrarAuditoria({
+      accion: 'prestamo_eliminado',
+      descripcion: `Se eliminó el préstamo de ${prestamo.cliente_nombre} (C$ ${Number(prestamo.monto).toLocaleString('es-NI')} prestados, C$ ${totalCobrado.toLocaleString('es-NI')} cobrados, ${pagadas}/${cuotas.length} cuotas pagadas)`,
+      monto: Number(prestamo.monto)
+    })
     await supabase.from('prestamos').delete().eq('id', id)
     navigate('/prestamos')
   }
