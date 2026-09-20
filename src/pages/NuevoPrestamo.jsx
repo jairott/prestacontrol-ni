@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
+import { registrarAuditoria } from '../lib/auditoria'
 
 export default function NuevoPrestamo() {
   const navigate = useNavigate()
@@ -60,6 +61,22 @@ export default function NuevoPrestamo() {
         else fecha.setMonth(fecha.getMonth() + 1)
       }
       await supabase.from('cuotas').insert(cuotas)
+
+      // Resta automática del capital disponible: el dinero prestado sale del capital, no de la caja
+      await supabase.from('movimientos_capital').insert({
+        tipo: 'prestamo',
+        monto,
+        concepto: `Préstamo entregado a ${form.cliente_nombre}`,
+        fecha: form.fecha_inicio,
+        prestamo_id: prestamo.id
+      })
+
+      await registrarAuditoria({
+        accion: 'prestamo_creado',
+        descripcion: `Préstamo nuevo de C$ ${monto.toLocaleString('es-NI')} a ${form.cliente_nombre} (${num} cuotas de C$ ${montoCuota.toLocaleString('es-NI')})`,
+        monto,
+        prestamo_id: prestamo.id
+      })
 
       navigate(`/prestamos/${prestamo.id}`)
     } catch(e) {
