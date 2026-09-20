@@ -11,6 +11,7 @@ const ACCION_INFO = {
   pago_deshecho: { label: 'Pago deshecho', color: '#ef4444' },
   prestamo_eliminado: { label: 'Préstamo eliminado', color: '#ef4444' },
   capital_aporte: { label: 'Aporte de capital', color: '#a855f7' },
+  capital_reset: { label: 'Reinicio de capital', color: '#64748b' },
   movimiento_caja_manual: { label: 'Movimiento manual', color: '#64748b' },
 }
 
@@ -306,8 +307,35 @@ function TabCapital() {
         </button>
       </div>
 
-      <p style={{color:'#475569',fontSize:12,margin:'0.5rem 0 1.5rem'}}>
-        Cada préstamo nuevo resta automáticamente del capital disponible. Usa "Aportar capital" cuando metas dinero propio al negocio.
+      <div style={{background:'#1e293b',borderRadius:14,padding:'1.25rem',marginBottom:'1.5rem'}}>
+        <h2 style={{color:'white',fontSize:14,fontWeight:600,margin:'0 0 0.25rem'}}>Portafolio de préstamos</h2>
+        <p style={{color:'#64748b',fontSize:12,margin:'0 0 1rem'}}>
+          Capital principal, intereses y total de TODOS los préstamos que existen (activos y pagados). Esto no se reinicia.
+        </p>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:12}}>
+          {[
+            { label:'Capital prestado', value:`C$ ${invertido.toLocaleString('es-NI')}`, icon: PiggyBank, color:'#6366f1' },
+            { label:'Intereses', value:`C$ ${interesEsperado.toLocaleString('es-NI')}`, icon: Percent, color:'#f59e0b' },
+            { label:'Total de inversión', value:`C$ ${totalARecuperar.toLocaleString('es-NI')}`, icon: Target, color:'#22c55e' },
+          ].map((c,i) => (
+            <div key={i} style={{
+              background:'#0f172a',borderRadius:10,padding:'1rem',display:'flex',gap:12,alignItems:'center'
+            }}>
+              <div style={{width:36,height:36,borderRadius:9,background:c.color+'22',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                <c.icon size={16} color={c.color} />
+              </div>
+              <div>
+                <p style={{color:'#64748b',fontSize:11,margin:0}}>{c.label}</p>
+                <p style={{color:'white',fontSize:'1rem',fontWeight:700,margin:0}}>{c.value}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <h2 style={{color:'white',fontSize:14,fontWeight:600,margin:'0 0 0.25rem'}}>Capital disponible para prestar</h2>
+      <p style={{color:'#64748b',fontSize:12,margin:'0 0 1rem'}}>
+        Lo que has aportado tú menos lo que se ha ido en préstamos nuevos desde que empezamos a llevar este control.
       </p>
 
       {mostrarForm && (
@@ -342,7 +370,7 @@ function TabCapital() {
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:12,marginBottom:'1.5rem'}}>
         {[
           { label:'Aportado', value:`C$ ${aportado.toLocaleString('es-NI')}`, icon: TrendingUp, color:'#22c55e' },
-          { label:'Prestado', value:`C$ ${prestado.toLocaleString('es-NI')}`, icon: TrendingDown, color:'#ef4444' },
+          { label:'Descontado por préstamos', value:`C$ ${prestado.toLocaleString('es-NI')}`, icon: TrendingDown, color:'#ef4444' },
           { label:'Capital disponible', value:`C$ ${disponible.toLocaleString('es-NI')}`, icon: PiggyBank, color: disponible >= 0 ? '#a855f7' : '#ef4444' },
         ].map((c,i) => (
           <div key={i} style={{
@@ -357,29 +385,6 @@ function TabCapital() {
             </div>
           </div>
         ))}
-      </div>
-
-      <div style={{background:'#1e293b',borderRadius:14,padding:'1.25rem',marginBottom:'1.5rem'}}>
-        <h2 style={{color:'white',fontSize:14,fontWeight:600,margin:'0 0 1rem'}}>Portafolio de préstamos (todos, activos y pagados)</h2>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:12}}>
-          {[
-            { label:'Invertido', value:`C$ ${invertido.toLocaleString('es-NI')}`, icon: PiggyBank, color:'#6366f1' },
-            { label:'Interés que vamos a ganar', value:`C$ ${interesEsperado.toLocaleString('es-NI')}`, icon: Percent, color:'#f59e0b' },
-            { label:'Total a recuperar', value:`C$ ${totalARecuperar.toLocaleString('es-NI')}`, icon: Target, color:'#22c55e' },
-          ].map((c,i) => (
-            <div key={i} style={{
-              background:'#0f172a',borderRadius:10,padding:'1rem',display:'flex',gap:12,alignItems:'center'
-            }}>
-              <div style={{width:36,height:36,borderRadius:9,background:c.color+'22',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-                <c.icon size={16} color={c.color} />
-              </div>
-              <div>
-                <p style={{color:'#64748b',fontSize:11,margin:0}}>{c.label}</p>
-                <p style={{color:'white',fontSize:'1rem',fontWeight:700,margin:0}}>{c.value}</p>
-              </div>
-            </div>
-          ))}
-        </div>
       </div>
 
       {fechas.length === 0 ? (
