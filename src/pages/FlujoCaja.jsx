@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { registrarAuditoria } from '../lib/auditoria'
-import { Wallet, TrendingUp, TrendingDown, Plus, X, PiggyBank, History } from 'lucide-react'
+import { Wallet, TrendingUp, TrendingDown, Plus, X, PiggyBank, History, Percent, Target } from 'lucide-react'
 
 const ACCION_INFO = {
   prestamo_creado: { label: 'Préstamo creado', color: '#6366f1' },
@@ -232,6 +232,7 @@ function TabCaja({ navigate }) {
 
 function TabCapital() {
   const [movimientos, setMovimientos] = useState([])
+  const [prestamos, setPrestamos] = useState([])
   const [loading, setLoading] = useState(true)
   const [mostrarForm, setMostrarForm] = useState(false)
   const [form, setForm] = useState({ monto:'', concepto:'', fecha: new Date().toISOString().split('T')[0] })
@@ -240,12 +241,13 @@ function TabCapital() {
 
   const cargar = async () => {
     setLoading(true)
-    const { data } = await supabase
-      .from('movimientos_capital')
-      .select('*, prestamos(cliente_nombre)')
-      .order('fecha', { ascending: false })
-      .order('created_at', { ascending: false })
-    setMovimientos(data || [])
+    const [{ data: mov }, { data: prest }] = await Promise.all([
+      supabase.from('movimientos_capital').select('*, prestamos(cliente_nombre)')
+        .order('fecha', { ascending: false }).order('created_at', { ascending: false }),
+      supabase.from('prestamos').select('monto, interes_porcentaje')
+    ])
+    setMovimientos(mov || [])
+    setPrestamos(prest || [])
     setLoading(false)
   }
 
@@ -280,6 +282,10 @@ function TabCapital() {
   const aportado = movimientos.filter(m => m.tipo === 'aporte').reduce((s,m) => s + Number(m.monto), 0)
   const prestado = movimientos.filter(m => m.tipo === 'prestamo').reduce((s,m) => s + Number(m.monto), 0)
   const disponible = aportado - prestado
+
+  const invertido = prestamos.reduce((s,p) => s + Number(p.monto), 0)
+  const interesEsperado = prestamos.reduce((s,p) => s + Number(p.monto) * (Number(p.interes_porcentaje || 0) / 100), 0)
+  const totalARecuperar = invertido + interesEsperado
 
   const grupos = {}
   movimientos.forEach(m => {
@@ -351,6 +357,29 @@ function TabCapital() {
             </div>
           </div>
         ))}
+      </div>
+
+      <div style={{background:'#1e293b',borderRadius:14,padding:'1.25rem',marginBottom:'1.5rem'}}>
+        <h2 style={{color:'white',fontSize:14,fontWeight:600,margin:'0 0 1rem'}}>Portafolio de préstamos (todos, activos y pagados)</h2>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:12}}>
+          {[
+            { label:'Invertido', value:`C$ ${invertido.toLocaleString('es-NI')}`, icon: PiggyBank, color:'#6366f1' },
+            { label:'Interés que vamos a ganar', value:`C$ ${interesEsperado.toLocaleString('es-NI')}`, icon: Percent, color:'#f59e0b' },
+            { label:'Total a recuperar', value:`C$ ${totalARecuperar.toLocaleString('es-NI')}`, icon: Target, color:'#22c55e' },
+          ].map((c,i) => (
+            <div key={i} style={{
+              background:'#0f172a',borderRadius:10,padding:'1rem',display:'flex',gap:12,alignItems:'center'
+            }}>
+              <div style={{width:36,height:36,borderRadius:9,background:c.color+'22',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                <c.icon size={16} color={c.color} />
+              </div>
+              <div>
+                <p style={{color:'#64748b',fontSize:11,margin:0}}>{c.label}</p>
+                <p style={{color:'white',fontSize:'1rem',fontWeight:700,margin:0}}>{c.value}</p>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {fechas.length === 0 ? (
