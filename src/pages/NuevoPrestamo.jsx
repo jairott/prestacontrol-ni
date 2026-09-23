@@ -62,9 +62,18 @@ export default function NuevoPrestamo() {
       }
       await supabase.from('cuotas').insert(cuotas)
 
-      // Resta automática del capital disponible: el dinero prestado sale del capital, no de la caja
+      // Resta automática del capital disponible: el dinero prestado sale del capital
       await supabase.from('movimientos_capital').insert({
         tipo: 'prestamo',
+        monto,
+        concepto: `Préstamo entregado a ${form.cliente_nombre}`,
+        fecha: form.fecha_inicio,
+        prestamo_id: prestamo.id
+      })
+
+      // También sale de la caja: es efectivo real que salió de la mano
+      await supabase.from('movimientos_caja').insert({
+        tipo: 'salida',
         monto,
         concepto: `Préstamo entregado a ${form.cliente_nombre}`,
         fecha: form.fecha_inicio,

@@ -126,7 +126,7 @@ function TabCaja({ navigate }) {
       </div>
 
       <p style={{color:'#475569',fontSize:12,margin:'0.5rem 0 1.5rem'}}>
-        Los pagos de cuotas se registran solos como entrada. El dinero entregado en préstamos nuevos NO se registra aquí (es capital) — usa "Nuevo movimiento" para anotar gastos, salidas de préstamos u otras entradas/salidas a mano.
+        Los pagos de cuotas y los préstamos nuevos se registran solos (entrada y salida). Usa "Nuevo movimiento" para anotar gastos u otras entradas/salidas a mano.
       </p>
 
       {mostrarForm && (
