@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { enviarReporteDiario } from '../lib/notificaciones'
-import { DollarSign, Users, AlertCircle, CheckCircle, Bell, Wallet, PiggyBank } from 'lucide-react'
+import { DollarSign, Users, AlertCircle, CheckCircle, Bell, Wallet, PiggyBank, Percent } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { desglosePrestamo } from '../utils'
 
 export default function Dashboard() {
-  const [stats, setStats] = useState({ total:0, activos:0, vencidos:0, cobrado:0, porRecoger:0, capitalDisponible:0 })
+  const [stats, setStats] = useState({ total:0, activos:0, vencidos:0, cobrado:0, porRecoger:0, capitalDisponible:0, capitalActivo:0, interesPorCobrar:0 })
   const [recientes, setRecientes] = useState([])
   const [atrasados, setAtrasados] = useState([])
   const [mostrarAtrasados, setMostrarAtrasados] = useState(false)
@@ -31,7 +32,14 @@ export default function Dashboard() {
       const porRecoger = cuotas?.filter(c => !c.pagada).reduce((s,c) => s + (Number(c.monto) - Number(c.monto_pagado || 0)), 0) || 0
       const capitalDisponible = movCapital?.reduce((s,m) => s + (m.tipo === 'aporte' ? Number(m.monto) : -Number(m.monto)), 0) || 0
 
-      setStats({ total: prestamos.length, activos, vencidos: vencidas, cobrado, porRecoger, capitalDisponible })
+      let capitalActivo = 0, interesPorCobrar = 0
+      prestamos.filter(p => p.estado === 'activo').forEach(p => {
+        const d = desglosePrestamo(p, cuotas?.filter(c => c.prestamo_id === p.id) || [])
+        capitalActivo += d.capitalPendiente
+        interesPorCobrar += d.interesPendiente
+      })
+
+      setStats({ total: prestamos.length, activos, vencidos: vencidas, cobrado, porRecoger, capitalDisponible, capitalActivo, interesPorCobrar })
       setRecientes(prestamos.slice(-5).reverse())
       setTodos([...prestamos].sort((a,b) => (a.cliente_nombre || '').localeCompare(b.cliente_nombre || '')))
 
@@ -109,7 +117,9 @@ export default function Dashboard() {
     { label:'Activos', value: stats.activos, icon: CheckCircle, color:'#22c55e', onClick: () => setMostrarActivos(v => !v), active: mostrarActivos },
     { label:'Cuotas vencidas', value: stats.vencidos, icon: AlertCircle, color:'#ef4444', onClick: () => setMostrarAtrasados(v => !v), active: mostrarAtrasados },
     { label:'Total cobrado', value: `C$ ${stats.cobrado.toLocaleString('es-NI')}`, icon: DollarSign, color:'#f59e0b' },
-    { label:'Capital por recoger', value: `C$ ${stats.porRecoger.toLocaleString('es-NI')}`, icon: Wallet, color:'#a855f7', onClick: () => setMostrarActivos(v => !v), active: mostrarActivos },
+    { label:'Capital activo', value: `C$ ${Math.round(stats.capitalActivo).toLocaleString('es-NI')}`, icon: PiggyBank, color:'#6366f1' },
+    { label:'Interés por cobrar', value: `C$ ${Math.round(stats.interesPorCobrar).toLocaleString('es-NI')}`, icon: Percent, color:'#f59e0b' },
+    { label:'Total por recoger', value: `C$ ${stats.porRecoger.toLocaleString('es-NI')}`, icon: Wallet, color:'#a855f7', onClick: () => setMostrarActivos(v => !v), active: mostrarActivos },
     { label:'Capital disponible', value: `C$ ${stats.capitalDisponible.toLocaleString('es-NI')}`, icon: PiggyBank, color: stats.capitalDisponible >= 0 ? '#22c55e' : '#ef4444' },
   ]
 

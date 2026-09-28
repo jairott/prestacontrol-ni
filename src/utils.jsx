@@ -34,3 +34,14 @@ export function addDays(dateStr, days) {
 export function today() {
   return new Date().toISOString().split('T')[0]
 }
+
+// Desglose de lo que falta por cobrar de un préstamo, separando capital e interés.
+// Cada pago se reparte en proporción (promedio): capital = monto / total del préstamo.
+export function desglosePrestamo(prestamo, cuotasPrestamo) {
+  const total = cuotasPrestamo.reduce((s,c) => s + Number(c.monto), 0) || Number(prestamo.monto) * (1 + Number(prestamo.interes_porcentaje || 0) / 100)
+  const cobrado = cuotasPrestamo.reduce((s,c) => s + (c.pagada ? Number(c.monto) : Number(c.monto_pagado || 0)), 0)
+  const pendiente = Math.max(0, total - cobrado)
+  const ratio = total > 0 ? Math.min(1, Number(prestamo.monto) / total) : 1
+  const capitalPendiente = pendiente * ratio
+  return { total, cobrado, pendiente, ratio, capitalPendiente, interesPendiente: pendiente - capitalPendiente }
+}

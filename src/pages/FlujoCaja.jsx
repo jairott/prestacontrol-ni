@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { registrarAuditoria } from '../lib/auditoria'
-import { Wallet, TrendingUp, TrendingDown, Plus, X, PiggyBank, History, Percent, Target } from 'lucide-react'
+import { desglosePrestamo } from '../utils'
+import { Wallet, TrendingUp, TrendingDown, Plus, X, PiggyBank, History, Percent, Target, RotateCcw } from 'lucide-react'
 
 const ACCION_INFO = {
   prestamo_creado: { label: 'Préstamo creado', color: '#6366f1' },
@@ -13,6 +14,7 @@ const ACCION_INFO = {
   capital_aporte: { label: 'Aporte de capital', color: '#a855f7' },
   capital_reset: { label: 'Reinicio de capital', color: '#64748b' },
   movimiento_caja_manual: { label: 'Movimiento manual', color: '#64748b' },
+  caja_reset: { label: 'Caja en cero', color: '#64748b' },
 }
 
 export default function FlujoCaja() {
@@ -63,15 +65,36 @@ function TabCaja({ navigate }) {
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
 
+  const [prestamos, setPrestamos] = useState([])
+  const [cuotas, setCuotas] = useState([])
+
   const cargar = async () => {
     setLoading(true)
-    const { data } = await supabase
-      .from('movimientos_caja')
-      .select('*, prestamos(cliente_nombre)')
-      .order('fecha', { ascending: false })
-      .order('created_at', { ascending: false })
+    const [{ data }, { data: prest }, { data: cuo }] = await Promise.all([
+      supabase.from('movimientos_caja')
+        .select('*, prestamos(cliente_nombre)')
+        .order('fecha', { ascending: false })
+        .order('created_at', { ascending: false }),
+      supabase.from('prestamos').select('*'),
+      supabase.from('cuotas').select('prestamo_id, monto, monto_pagado, pagada'),
+    ])
     setMovimientos(data || [])
+    setPrestamos(prest || [])
+    setCuotas(cuo || [])
     setLoading(false)
+  }
+
+  const ponerEnCero = async () => {
+    if (!window.confirm('¿Poner la CAJA en CERO?\n\nSe borran los movimientos de caja para empezar de nuevo. Los clientes, préstamos y cuotas NO se tocan, y queda registrado en Auditoría.')) return
+    const saldoAnterior = saldo
+    const { error: err } = await supabase.from('movimientos_caja').delete().not('id', 'is', null)
+    if (err) { alert('No se pudo reiniciar la caja: ' + err.message); return }
+    await registrarAuditoria({
+      accion: 'caja_reset',
+      descripcion: `Caja puesta en cero (saldo anterior: C$ ${saldoAnterior.toLocaleString('es-NI')})`,
+      monto: saldoAnterior
+    })
+    cargar()
   }
 
   useEffect(() => { cargar() }, [])
@@ -106,6 +129,26 @@ function TabCaja({ navigate }) {
   const salidas = movimientos.filter(m => m.tipo === 'salida').reduce((s,m) => s + Number(m.monto), 0)
   const saldo = entradas - salidas
 
+  // Cartera activa en vivo: lo que deben los clientes, separado en capital e interés
+  const cuotasPorPrestamo = {}
+  cuotas.forEach(c => { (cuotasPorPrestamo[c.prestamo_id] ||= []).push(c) })
+  const ratioPorPrestamo = {}
+  const cartera = prestamos.map(p => {
+    const d = desglosePrestamo(p, cuotasPorPrestamo[p.id] || [])
+    ratioPorPrestamo[p.id] = d.ratio
+    return { ...p, ...d }
+  }).filter(p => p.estado === 'activo' && p.pendiente > 0.01)
+    .sort((a,b) => b.pendiente - a.pendiente)
+  const capitalActivo = cartera.reduce((s,p) => s + p.capitalPendiente, 0)
+  const interesPorCobrar = cartera.reduce((s,p) => s + p.interesPendiente, 0)
+
+  // Entradas de cobros separadas en capital e interés (mismo promedio del préstamo)
+  const entradasCapital = movimientos.filter(m => m.tipo === 'entrada')
+    .reduce((s,m) => s + Number(m.monto) * (m.prestamo_id && ratioPorPrestamo[m.prestamo_id] != null ? ratioPorPrestamo[m.prestamo_id] : 1), 0)
+  const entradasInteres = entradas - entradasCapital
+
+  const f = n => `C$ ${Math.round(n).toLocaleString('es-NI')}`
+
   const grupos = {}
   movimientos.forEach(m => {
     if (!grupos[m.fecha]) grupos[m.fecha] = []
@@ -115,7 +158,13 @@ function TabCaja({ navigate }) {
 
   return (
     <div>
-      <div style={{display:'flex',justifyContent:'flex-end',marginBottom:'0.25rem'}}>
+      <div style={{display:'flex',justifyContent:'flex-end',gap:8,marginBottom:'0.25rem'}}>
+        <button onClick={ponerEnCero} style={{
+          display:'flex',alignItems:'center',gap:6,background:'#ef444422',color:'#ef4444',
+          border:'1px solid #ef444444',borderRadius:10,padding:'8px 14px',cursor:'pointer',fontSize:13,fontWeight:600
+        }}>
+          <RotateCcw size={15}/> Caja en cero
+        </button>
         <button onClick={() => setMostrarForm(v => !v)} style={{
           display:'flex',alignItems:'center',gap:6,background:'#6366f1',color:'white',
           border:'none',borderRadius:10,padding:'8px 14px',cursor:'pointer',fontSize:13,fontWeight:600
@@ -175,7 +224,7 @@ function TabCaja({ navigate }) {
 
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:12,marginBottom:'1.5rem'}}>
         {[
-          { label:'Entradas', value:`C$ ${entradas.toLocaleString('es-NI')}`, icon: TrendingUp, color:'#22c55e' },
+          { label:'Entradas', value:`C$ ${entradas.toLocaleString('es-NI')}`, icon: TrendingUp, color:'#22c55e', sub:`Capital ${f(entradasCapital)} · Interés ${f(entradasInteres)}` },
           { label:'Salidas', value:`C$ ${salidas.toLocaleString('es-NI')}`, icon: TrendingDown, color:'#ef4444' },
           { label:'Saldo', value:`C$ ${saldo.toLocaleString('es-NI')}`, icon: Wallet, color: saldo >= 0 ? '#a855f7' : '#ef4444' },
         ].map((c,i) => (
@@ -188,14 +237,55 @@ function TabCaja({ navigate }) {
             <div>
               <p style={{color:'#64748b',fontSize:11,margin:0}}>{c.label}</p>
               <p style={{color:'white',fontSize:'1.1rem',fontWeight:700,margin:0}}>{c.value}</p>
+              {c.sub && <p style={{color:'#64748b',fontSize:11,margin:0}}>{c.sub}</p>}
             </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{background:'#1e293b',borderRadius:14,padding:'1.25rem',marginBottom:'1.5rem'}}>
+        <h2 style={{color:'white',fontSize:14,fontWeight:600,margin:'0 0 0.25rem'}}>Capital total activo (en vivo)</h2>
+        <p style={{color:'#64748b',fontSize:12,margin:'0 0 1rem'}}>
+          Lo que realmente deben los clientes activos, separado en capital e interés. Cada abono se reparte en proporción (ej: préstamo de 2,000 al 20% → de cada C$ 100 cobrados, C$ 83 son capital y C$ 17 interés).
+        </p>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:12,marginBottom:'1rem'}}>
+          {[
+            { label:'Capital activo', value: f(capitalActivo), icon: PiggyBank, color:'#6366f1' },
+            { label:'Interés por cobrar', value: f(interesPorCobrar), icon: Percent, color:'#f59e0b' },
+            { label:'Total por cobrar', value: f(capitalActivo + interesPorCobrar), icon: Target, color:'#22c55e' },
+          ].map((c,i) => (
+            <div key={i} style={{background:'#0f172a',borderRadius:10,padding:'1rem',display:'flex',gap:12,alignItems:'center'}}>
+              <div style={{width:36,height:36,borderRadius:9,background:c.color+'22',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                <c.icon size={16} color={c.color} />
+              </div>
+              <div>
+                <p style={{color:'#64748b',fontSize:11,margin:0}}>{c.label}</p>
+                <p style={{color:'white',fontSize:'1rem',fontWeight:700,margin:0}}>{c.value}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+        {cartera.length === 0 ? (
+          <p style={{color:'#64748b',fontSize:13,margin:0}}>No hay clientes activos con saldo.</p>
+        ) : cartera.map(p => (
+          <div key={p.id} onClick={() => navigate(`/prestamos/${p.id}`)} style={{
+            display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,
+            padding:'8px 0',borderBottom:'1px solid #334155',cursor:'pointer'
+          }}>
+            <div style={{minWidth:0}}>
+              <p style={{color:'white',fontWeight:600,margin:0,fontSize:13}}>{p.cliente_nombre}</p>
+              <p style={{color:'#64748b',fontSize:11,margin:0}}>
+                Prestó {f(p.monto)} · Capital <span style={{color:'#a5b4fc'}}>{f(p.capitalPendiente)}</span> · Interés <span style={{color:'#fbbf24'}}>{f(p.interesPendiente)}</span>
+              </p>
+            </div>
+            <p style={{color:'white',fontWeight:700,margin:0,fontSize:14,whiteSpace:'nowrap'}}>{f(p.pendiente)}</p>
           </div>
         ))}
       </div>
 
       {fechas.length === 0 ? (
         <div style={{background:'#1e293b',borderRadius:14,padding:'1.5rem'}}>
-          <p style={{color:'#64748b',fontSize:14,margin:0}}>Todavía no hay movimientos registrados hoy.</p>
+          <p style={{color:'#64748b',fontSize:14,margin:0}}>Caja en cero. Los cobros entran y los préstamos nuevos salen solos.</p>
         </div>
       ) : fechas.map(fecha => {
         const movsDia = grupos[fecha]
