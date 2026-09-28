@@ -1,0 +1,10 @@
+-- Vigilante de Caja (aplicado en Supabase 2026-09-28 como migración "vigilante_caja_whatsapp").
+-- Cada INSERT en public.auditoria -> trigger vigilante_auditoria -> POST (pg_net) al webhook n8n
+--   https://traimax2.app.n8n.cloud/webhook/prestacontrol-caja
+--   (workflow n8n "PrestaControl - Vigilante de Caja (WhatsApp)", id Ytuzwg8CguVUEvf7)
+--   que lo manda por WhatsApp (número de Liz 1307) al 14322485456.
+-- Resumen diario: pg_cron job "vigilante_resumen_7am" ('0 13 * * *' UTC = 7:00 am Nicaragua)
+--   ejecuta public.vigilante_resumen_diario().
+-- El webhook exige el header x-prestacontrol-secret (valor en la función public.vigilante_enviar, no se repite aquí).
+-- Para apagarlo:  drop trigger vigilante_auditoria on public.auditoria;
+--                 select cron.unschedule('vigilante_resumen_7am');
