@@ -2,3 +2,6 @@ node_modules/
 dist/
 .env
 .env.local
+
+# Archivos multimedia generados para Jairo (videos de anuncios, etc.) — se entregan directo, no se versionan
+entregables/
